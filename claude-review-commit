@@ -1,0 +1,373 @@
+#!/bin/bash
+
+#
+# claude-review-commit - Professional Git Commit Review Tool
+#
+# This script provides automated git commit review using Claude AI.
+# It analyzes staged changes and generates conventional commit messages.
+#
+# Author: Generated for enhanced productivity
+# Version: 1.0.0
+#
+
+set -euo pipefail
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+# Default configuration - can be overridden by environment variables
+CLAUDE_REVIEW_PROMPT_PATH="${CLAUDE_REVIEW_PROMPT_PATH:-}"  # Empty means use embedded prompt
+CLAUDE_INPUT_FORMAT="${CLAUDE_INPUT_FORMAT:-text}"
+CLAUDE_OUTPUT_FORMAT="${CLAUDE_OUTPUT_FORMAT:-text}"
+CLAUDE_ALLOWED_TOOLS="${CLAUDE_ALLOWED_TOOLS:-Bash(git:*) Edit}"
+CLAUDE_BINARY="${CLAUDE_BINARY:-claude}"
+CLAUDE_EXTRA_ARGS="${CLAUDE_EXTRA_ARGS:-}"
+
+# Script metadata
+SCRIPT_NAME="$(basename "$0")"
+SCRIPT_VERSION="1.0.0"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# =============================================================================
+# EMBEDDED AGENT PROMPT
+# =============================================================================
+
+# Git Commit Review Agent Prompt - embedded for portability
+get_review_prompt() {
+    cat << 'EOF'
+# Git Commit Agent Prompt
+
+You are a code review and git commit assistant. Your task is to analyze staged changes, evaluate commit quality, and generate conventional commit messages.
+
+## Instructions
+
+1. **Fetch Changes**: Execute `git diff --cached` to retrieve all staged changes
+2. **Analyze Changes**: Review the diff output to understand:
+   - Files modified, added, or deleted
+   - Code changes and their impact
+   - Potential issues or improvements
+3. **Evaluate Commit Quality**: Assess the commit based on:
+   - **Atomicity**: Does this commit represent a single logical change?
+   - **Completeness**: Are all related changes included?
+   - **Code Quality**: Are there any obvious issues, code smells, or missing tests?
+   - **Best Practices**: Does it follow coding standards and conventions?
+   - **Breaking Changes**: Are there any breaking changes that need special attention?
+4. **Generate Commit Message**: Create a conventional commit message following the format:
+   ```
+   <type>[optional scope]: <description>
+   
+   [optional body]
+   
+   [optional footer(s)]
+   ```
+
+## Output Format
+
+Structure your response exactly as follows:
+
+```
+<KReview>
+[Your detailed commit quality evaluation here, including scores/ratings and specific recommendations]
+</KReview>
+
+<KCommit>
+[Your conventional commit message here]
+</KCommit>
+```
+
+## Conventional Commit Types
+
+Use these standard types:
+- **feat**: A new feature
+- **fix**: A bug fix
+- **docs**: Documentation only changes
+- **style**: Changes that do not affect the meaning of the code
+- **refactor**: A code change that neither fixes a bug nor adds a feature
+- **perf**: A code change that improves performance
+- **test**: Adding missing tests or correcting existing tests
+- **build**: Changes that affect the build system or external dependencies
+- **ci**: Changes to CI configuration files and scripts
+- **chore**: Other changes that don't modify src or test files
+- **revert**: Reverts a previous commit
+
+## Quality Assessment Criteria
+
+Rate each aspect (1-5 scale) and provide specific feedback:
+- **Atomicity**: Single responsibility principle
+- **Readability**: Code clarity and documentation
+- **Testing**: Test coverage and quality
+- **Security**: Potential security implications
+- **Performance**: Impact on system performance
+- **Maintainability**: Long-term code sustainability
+
+## Example Output
+
+```
+<KReview>
+Atomicity: 4/5 - Well-focused change adding user authentication
+Readability: 5/5 - Clear variable names and good documentation
+Testing: 3/5 - Basic tests included but edge cases missing
+Security: 4/5 - Proper password hashing, but rate limiting needed
+Performance: 5/5 - No performance concerns
+Maintainability: 4/5 - Good structure, minor coupling issues
+
+Overall: 4.2/5 - Good commit with minor improvements needed for testing and security.
+Recommendations: Add rate limiting and test edge cases for invalid inputs.
+</KReview>
+
+<KCommit>
+feat(auth): implement user authentication with JWT tokens
+
+- Add login and registration endpoints
+- Implement JWT token generation and validation
+- Add password hashing with bcrypt
+- Include basic authentication middleware
+
+Closes #123
+</KCommit>
+```
+EOF
+}
+
+# =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
+
+# Print colored output
+print_info() {
+    echo -e "\033[36m[INFO]\033[0m $*" >&2
+}
+
+print_warn() {
+    echo -e "\033[33m[WARN]\033[0m $*" >&2
+}
+
+print_error() {
+    echo -e "\033[31m[ERROR]\033[0m $*" >&2
+}
+
+print_success() {
+    echo -e "\033[32m[SUCCESS]\033[0m $*" >&2
+}
+
+# Show usage information
+show_usage() {
+    cat << EOF
+Usage: $SCRIPT_NAME [OPTIONS]
+
+Git commit review tool using Claude AI to analyze staged changes and generate
+conventional commit messages with quality assessments.
+
+OPTIONS:
+    -h, --help              Show this help message
+    -v, --version           Show version information
+    -d, --debug             Enable debug mode
+    -q, --quiet             Suppress informational output
+    --prompt-path PATH      Custom path to prompt file
+    --claude-binary PATH    Custom path to claude binary
+    --dry-run              Show command that would be executed without running
+
+ENVIRONMENT VARIABLES:
+    CLAUDE_REVIEW_PROMPT_PATH   Path to external prompt file (optional - uses embedded by default)
+    CLAUDE_INPUT_FORMAT         Input format for Claude (default: text)
+    CLAUDE_OUTPUT_FORMAT        Output format for Claude (default: text)
+    CLAUDE_ALLOWED_TOOLS        Tools allowed for Claude
+    CLAUDE_BINARY               Path to Claude binary
+    CLAUDE_EXTRA_ARGS           Additional arguments for Claude
+
+EXAMPLES:
+    $SCRIPT_NAME                           # Standard review
+    $SCRIPT_NAME --debug                   # Debug mode
+    $SCRIPT_NAME --dry-run                 # Show command without executing
+    $SCRIPT_NAME --prompt-path ./my-prompt # Use custom prompt
+
+For more information, visit: https://github.com/anthropics/claude-code
+EOF
+}
+
+# Show version information
+show_version() {
+    echo "$SCRIPT_NAME version $SCRIPT_VERSION"
+}
+
+# Validate prerequisites
+validate_environment() {
+    local errors=0
+
+    # Check if we're in a git repository
+    if ! git rev-parse --git-dir >/dev/null 2>&1; then
+        print_error "Not in a git repository"
+        ((errors++))
+    fi
+
+    # Check if Claude binary exists
+    if ! command -v "$CLAUDE_BINARY" >/dev/null 2>&1; then
+        print_error "Claude binary not found: $CLAUDE_BINARY"
+        print_info "Install Claude or set CLAUDE_BINARY environment variable"
+        ((errors++))
+    fi
+
+    # Check if prompt file exists (only if external prompt specified)
+    if [[ -n "$CLAUDE_REVIEW_PROMPT_PATH" && ! -f "$CLAUDE_REVIEW_PROMPT_PATH" ]]; then
+        print_error "External prompt file not found: $CLAUDE_REVIEW_PROMPT_PATH"
+        print_info "File does not exist, will use embedded prompt instead"
+        CLAUDE_REVIEW_PROMPT_PATH=""  # Fall back to embedded
+    fi
+
+    # Check if there are staged changes
+    if ! git diff --cached --quiet; then
+        print_info "Found staged changes to review"
+    else
+        print_warn "No staged changes found. Use 'git add' to stage files for review."
+    fi
+
+    return $errors
+}
+
+# =============================================================================
+# MAIN FUNCTIONALITY
+# =============================================================================
+
+# Execute the Claude review
+execute_review() {
+    local debug_mode="$1"
+    local quiet_mode="$2"
+    local dry_run="$3"
+
+    # Determine prompt source
+    local prompt_source
+    if [[ -n "$CLAUDE_REVIEW_PROMPT_PATH" ]]; then
+        prompt_source="cat \"$CLAUDE_REVIEW_PROMPT_PATH\""
+    else
+        prompt_source="get_review_prompt"
+    fi
+
+    # Build the command
+    local cmd=(
+        "$prompt_source"
+        "|"
+        "$CLAUDE_BINARY"
+        --input-format "$CLAUDE_INPUT_FORMAT"
+        --output-format "$CLAUDE_OUTPUT_FORMAT"
+        --allowedTools "'"$CLAUDE_ALLOWED_TOOLS"'"
+        --print
+        --verbose
+    )
+
+    # Add extra arguments if specified
+    if [[ -n "$CLAUDE_EXTRA_ARGS" ]]; then
+        cmd+=($CLAUDE_EXTRA_ARGS)
+    fi
+
+    # Join command for display/execution
+    local full_command="${cmd[*]}"
+
+    if [[ "$debug_mode" == "true" ]]; then
+        print_info "Executing command: $full_command"
+        if [[ -n "$CLAUDE_REVIEW_PROMPT_PATH" ]]; then
+            print_info "Using external prompt: $CLAUDE_REVIEW_PROMPT_PATH"
+        else
+            print_info "Using embedded prompt"
+        fi
+        print_info "Claude binary: $CLAUDE_BINARY"
+    fi
+
+    if [[ "$dry_run" == "true" ]]; then
+        echo "Would execute:"
+        echo "$full_command"
+        return 0
+    fi
+
+    if [[ "$quiet_mode" == "false" ]]; then
+        if [[ -n "$CLAUDE_REVIEW_PROMPT_PATH" ]]; then
+            print_info "Analyzing staged changes with Claude (external prompt)..."
+        else
+            print_info "Analyzing staged changes with Claude (embedded prompt)..."
+        fi
+    fi
+
+    # Execute the command
+    eval "$full_command"
+    local exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
+        if [[ "$quiet_mode" == "false" ]]; then
+            print_success "Review completed successfully"
+        fi
+    else
+        print_error "Claude execution failed with exit code $exit_code"
+        return $exit_code
+    fi
+}
+
+# =============================================================================
+# ARGUMENT PARSING
+# =============================================================================
+
+main() {
+    local debug_mode="false"
+    local quiet_mode="false"
+    local dry_run="false"
+
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            -v|--version)
+                show_version
+                exit 0
+                ;;
+            -d|--debug)
+                debug_mode="true"
+                shift
+                ;;
+            -q|--quiet)
+                quiet_mode="true"
+                shift
+                ;;
+            --dry-run)
+                dry_run="true"
+                shift
+                ;;
+            --prompt-path)
+                CLAUDE_REVIEW_PROMPT_PATH="$2"
+                shift 2
+                ;;
+            --claude-binary)
+                CLAUDE_BINARY="$2"
+                shift 2
+                ;;
+            -*)
+                print_error "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+            *)
+                print_error "Unexpected argument: $1"
+                show_usage
+                exit 1
+                ;;
+        esac
+    done
+
+    # Validate environment
+    if ! validate_environment; then
+        exit 1
+    fi
+
+    # Execute the review
+    execute_review "$debug_mode" "$quiet_mode" "$dry_run"
+}
+
+# =============================================================================
+# SCRIPT EXECUTION
+# =============================================================================
+
+# Only run main if script is executed directly (not sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

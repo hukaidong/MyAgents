@@ -1,0 +1,276 @@
+#!/bin/bash
+
+#
+# claude-generic - Generic Claude Agent Tool
+#
+# This script provides a generic framework for running Claude AI agents
+# with configurable prompts from the promptLibrary directory.
+#
+# Author: Generated for enhanced productivity
+# Version: 1.0.0
+#
+
+set -euo pipefail
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+# Default configuration - can be overridden by environment variables
+CLAUDE_INPUT_FORMAT="${CLAUDE_INPUT_FORMAT:-text}"
+CLAUDE_OUTPUT_FORMAT="${CLAUDE_OUTPUT_FORMAT:-"stream-json"}"
+CLAUDE_ALLOWED_TOOLS="${CLAUDE_ALLOWED_TOOLS:-Edit Bash(*)}"
+CLAUDE_BINARY="${CLAUDE_BINARY:-claude}"
+CLAUDE_EXTRA_ARGS="${CLAUDE_EXTRA_ARGS:-}"
+PROMPT_LIBRARY_DIR="${PROMPT_LIBRARY_DIR:-$HOME/bin/promptLibrary}"
+
+# Script metadata
+SCRIPT_NAME="$(basename "$0")"
+SCRIPT_VERSION="1.0.0"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
+
+# Print colored output
+print_info() {
+    echo -e "\033[36m[INFO]\033[0m $*" >&2
+}
+
+print_warn() {
+    echo -e "\033[33m[WARN]\033[0m $*" >&2
+}
+
+print_error() {
+    echo -e "\033[31m[ERROR]\033[0m $*" >&2
+}
+
+print_success() {
+    echo -e "\033[32m[SUCCESS]\033[0m $*" >&2
+}
+
+# Show usage information
+show_usage() {
+    cat << EOF
+Usage: $SCRIPT_NAME <agent-name> [OPTIONS]
+
+Generic Claude agent runner that loads prompts from the promptLibrary directory.
+
+ARGUMENTS:
+    agent-name                  Name of the agent (loads from promptLibrary/<agent-name>-agent)
+
+OPTIONS:
+    -h, --help                  Show this help message
+    -v, --version               Show version information
+    -d, --debug                 Enable debug mode
+    -q, --quiet                 Suppress informational output
+    --prompt-path PATH          Override default prompt path
+    --claude-binary PATH        Custom path to claude binary
+    --dry-run                   Show command that would be executed without running
+
+ENVIRONMENT VARIABLES:
+    CLAUDE_INPUT_FORMAT         Input format for Claude (default: text)
+    CLAUDE_OUTPUT_FORMAT        Output format for Claude (default: text)
+    CLAUDE_ALLOWED_TOOLS        Tools allowed for Claude (default: *)
+    CLAUDE_BINARY               Path to Claude binary
+    CLAUDE_EXTRA_ARGS           Additional arguments for Claude
+    PROMPT_LIBRARY_DIR          Directory containing prompt files (default: ./promptLibrary)
+
+EXAMPLES:
+    $SCRIPT_NAME code-reviewer              # Run code-reviewer agent
+    $SCRIPT_NAME documentation --debug      # Run documentation agent in debug mode
+    $SCRIPT_NAME analyzer --dry-run         # Show command without executing
+
+For more information, visit: https://github.com/anthropics/claude-code
+EOF
+}
+
+# Show version information
+show_version() {
+    echo "$SCRIPT_NAME version $SCRIPT_VERSION"
+}
+
+# Validate prerequisites
+validate_environment() {
+    local agent_name="$1"
+    local prompt_path="$2"
+    local errors=0
+
+    # Check if Claude binary exists
+    if ! command -v "$CLAUDE_BINARY" >/dev/null 2>&1; then
+        print_error "Claude binary not found: $CLAUDE_BINARY"
+        print_info "Install Claude or set CLAUDE_BINARY environment variable"
+        ((errors++))
+    fi
+
+    # Check if prompt file exists
+    if [[ ! -f "$prompt_path" ]]; then
+        print_error "Prompt file not found: $prompt_path"
+        print_info "Expected prompt file for agent '$agent_name' at: $prompt_path"
+        ((errors++))
+    fi
+
+    return $errors
+}
+
+# =============================================================================
+# MAIN FUNCTIONALITY
+# =============================================================================
+
+# Execute the Claude agent
+execute_agent() {
+    local agent_name="$1"
+    local prompt_path="$2"
+    local debug_mode="$3"
+    local quiet_mode="$4"
+    local dry_run="$5"
+
+    # Build the command
+    local cmd=(
+        "cat \"$prompt_path\""
+        "|"
+        "$CLAUDE_BINARY"
+        --input-format "$CLAUDE_INPUT_FORMAT"
+        --output-format "$CLAUDE_OUTPUT_FORMAT"
+        --allowedTools "'"$CLAUDE_ALLOWED_TOOLS"'"
+        # --print
+        --verbose
+        "|"
+        jq
+        -r
+        "'" '.message.content[0] | if .type == "text" then .text elif .type == "tool_use" then "\(.name) \(.input)" elif .type == "tool_result" then .content else empty end | . +="\n\n######\n\n"' "'"
+    )
+
+    # Add extra arguments if specified
+    if [[ -n "$CLAUDE_EXTRA_ARGS" ]]; then
+        cmd+=($CLAUDE_EXTRA_ARGS)
+    fi
+
+    # Join command for display/execution
+    local full_command="${cmd[*]}"
+
+    if [[ "$debug_mode" == "true" ]]; then
+        print_info "Executing command: $full_command"
+        print_info "Agent: $agent_name"
+        print_info "Prompt file: $prompt_path"
+        print_info "Claude binary: $CLAUDE_BINARY"
+    fi
+
+    if [[ "$dry_run" == "true" ]]; then
+        echo "Would execute:"
+        echo "$full_command"
+        return 0
+    fi
+
+    if [[ "$quiet_mode" == "false" ]]; then
+        print_info "Running $agent_name agent with Claude..."
+    fi
+
+    # Execute the command
+    eval "$full_command"
+    local exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
+        if [[ "$quiet_mode" == "false" ]]; then
+            print_success "Agent execution completed successfully"
+        fi
+    else
+        print_error "Claude execution failed with exit code $exit_code"
+        return $exit_code
+    fi
+}
+
+# =============================================================================
+# ARGUMENT PARSING
+# =============================================================================
+
+main() {
+    local agent_name=""
+    local debug_mode="false"
+    local quiet_mode="false"
+    local dry_run="false"
+    local custom_prompt_path=""
+
+    # Parse command line arguments first to handle help/version before requiring agent name
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            -v|--version)
+                show_version
+                exit 0
+                ;;
+            -d|--debug)
+                debug_mode="true"
+                shift
+                ;;
+            -q|--quiet)
+                quiet_mode="true"
+                shift
+                ;;
+            --dry-run)
+                dry_run="true"
+                shift
+                ;;
+            --prompt-path)
+                custom_prompt_path="$2"
+                shift 2
+                ;;
+            --claude-binary)
+                CLAUDE_BINARY="$2"
+                shift 2
+                ;;
+            -*)
+                print_error "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+            *)
+                # This must be the agent name (first non-option argument)
+                if [[ -z "$agent_name" ]]; then
+                    agent_name="$1"
+                    shift
+                else
+                    print_error "Unexpected argument: $1"
+                    show_usage
+                    exit 1
+                fi
+                ;;
+        esac
+    done
+
+    # Check if agent name was provided
+    if [[ -z "$agent_name" ]]; then
+        print_error "Agent name is required"
+        show_usage
+        exit 1
+    fi
+
+    # Determine prompt path
+    local prompt_path
+    if [[ -n "$custom_prompt_path" ]]; then
+        prompt_path="$custom_prompt_path"
+    else
+        prompt_path="$PROMPT_LIBRARY_DIR/${agent_name}-agent"
+    fi
+
+    # Validate environment
+    if ! validate_environment "$agent_name" "$prompt_path"; then
+        exit 1
+    fi
+
+    # Execute the agent
+    execute_agent "$agent_name" "$prompt_path" "$debug_mode" "$quiet_mode" "$dry_run"
+}
+
+# =============================================================================
+# SCRIPT EXECUTION
+# =============================================================================
+
+# Only run main if script is executed directly (not sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
