@@ -17,11 +17,11 @@ set -euo pipefail
 # =============================================================================
 
 # Default configuration - can be overridden by environment variables
-CLAUDE_INPUT_FORMAT="${CLAUDE_INPUT_FORMAT:-text}"
-CLAUDE_OUTPUT_FORMAT="${CLAUDE_OUTPUT_FORMAT:-"stream-json"}"
-CLAUDE_ALLOWED_TOOLS="${CLAUDE_ALLOWED_TOOLS:-Edit Bash(*)}"
-CLAUDE_BINARY="${CLAUDE_BINARY:-"cursor-agent"}"
-CLAUDE_EXTRA_ARGS="${CLAUDE_EXTRA_ARGS:-}"
+CURSOR_INPUT_FORMAT="${CURSOR_INPUT_FORMAT:-text}"
+CURSOR_OUTPUT_FORMAT="${CURSOR_OUTPUT_FORMAT:-"text"}"
+CURSOR_ALLOWED_TOOLS="${CURSOR_ALLOWED_TOOLS:-Edit Bash(*)}"
+CURSOR_BINARY="${CURSOR_BINARY:-"cursor-agent"}"
+CURSOR_EXTRA_ARGS="${CURSOR_EXTRA_ARGS:-}"
 PROMPT_LIBRARY_DIR="${PROMPT_LIBRARY_DIR:-$HOME/bin/promptLibrary}"
 
 # Script metadata
@@ -70,11 +70,11 @@ OPTIONS:
     --dry-run                   Show command that would be executed without running
 
 ENVIRONMENT VARIABLES:
-    CLAUDE_INPUT_FORMAT         Input format for Claude (default: text)
-    CLAUDE_OUTPUT_FORMAT        Output format for Claude (default: text)
-    CLAUDE_ALLOWED_TOOLS        Tools allowed for Claude (default: *)
-    CLAUDE_BINARY               Path to Claude binary
-    CLAUDE_EXTRA_ARGS           Additional arguments for Claude
+    CURSOR_INPUT_FORMAT         Input format for Claude (default: text)
+    CURSOR_OUTPUT_FORMAT        Output format for Claude (default: text)
+    CURSOR_ALLOWED_TOOLS        Tools allowed for Claude (default: *)
+    CURSOR_BINARY               Path to Claude binary
+    CURSOR_EXTRA_ARGS           Additional arguments for Claude
     PROMPT_LIBRARY_DIR          Directory containing prompt files (default: ./promptLibrary)
 
 EXAMPLES:
@@ -98,9 +98,9 @@ validate_environment() {
     local errors=0
 
     # Check if Claude binary exists
-    if ! command -v "$CLAUDE_BINARY" >/dev/null 2>&1; then
-        print_error "Claude binary not found: $CLAUDE_BINARY"
-        print_info "Install Claude or set CLAUDE_BINARY environment variable"
+    if ! command -v "$CURSOR_BINARY" >/dev/null 2>&1; then
+        print_error "Claude binary not found: $CURSOR_BINARY"
+        print_info "Install Claude or set CURSOR_BINARY environment variable"
         ((errors++))
     fi
 
@@ -130,20 +130,16 @@ execute_agent() {
     local cmd=(
         "cat \"$prompt_path\""
         "|"
-        "$CLAUDE_BINARY"
+        "$CURSOR_BINARY"
         sonnet
-        --output-format "$CLAUDE_OUTPUT_FORMAT"
+        --output-format "$CURSOR_OUTPUT_FORMAT"
         --print
         --force
-        #"|"
-        #jq
-        #-r
-        #"'" '.message.content[0] | if .type == "text" then .text elif .type == "tool_use" then "\(.name) \(.input)" elif .type == "tool_result" then .content else empty end | . +="\n\n######\n\n"' "'"
     )
 
     # Add extra arguments if specified
-    if [[ -n "$CLAUDE_EXTRA_ARGS" ]]; then
-        cmd+=($CLAUDE_EXTRA_ARGS)
+    if [[ -n "$CURSOR_EXTRA_ARGS" ]]; then
+        cmd+=($CURSOR_EXTRA_ARGS)
     fi
 
     # Join command for display/execution
@@ -153,7 +149,7 @@ execute_agent() {
         print_info "Executing command: $full_command"
         print_info "Agent: $agent_name"
         print_info "Prompt file: $prompt_path"
-        print_info "Claude binary: $CLAUDE_BINARY"
+        print_info "Claude binary: $CURSOR_BINARY"
     fi
 
     if [[ "$dry_run" == "true" ]]; then
@@ -219,7 +215,7 @@ main() {
                 shift 2
                 ;;
             --claude-binary)
-                CLAUDE_BINARY="$2"
+                CURSOR_BINARY="$2"
                 shift 2
                 ;;
             -*)
