@@ -1,0 +1,76 @@
+{
+  "nodes": {
+    "cursor-agent": {
+      "inputs": {
+        "cursor-cli": "cursor-cli",
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1756837686,
+        "narHash": "sha256-NS06EY/A4Ssjr+s/7+Z/CqghfCMN9ozB5C2EgHhvgh4=",
+        "owner": "hukaidong",
+        "repo": "cursor-agent-flake",
+        "rev": "608d4c27265d06073e0a32e037141617966dc998",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hukaidong",
+        "repo": "cursor-agent-flake",
+        "type": "github"
+      }
+    },
+    "cursor-cli": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1756270369,
+        "narHash": "sha256-P/avVwSfz811SehNXmv+QagWnhLExlX36G6EpvBD/Hk=",
+        "type": "tarball",
+        "url": "https://downloads.cursor.com/lab/2025.08.27-24c29c1/linux/x64/agent-cli-package.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://downloads.cursor.com/lab/2025.08.27-24c29c1/linux/x64/agent-cli-package.tar.gz"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1756542300,
+        "narHash": "sha256-tlOn88coG5fzdyqz6R93SQL5Gpq+m/DsWpekNFhqPQk=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "d7600c775f877cd87b4f5a831c28aa94137377aa",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1756542300,
+        "narHash": "sha256-tlOn88coG5fzdyqz6R93SQL5Gpq+m/DsWpekNFhqPQk=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "d7600c775f877cd87b4f5a831c28aa94137377aa",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "cursor-agent": "cursor-agent",
+        "nixpkgs": "nixpkgs_2"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

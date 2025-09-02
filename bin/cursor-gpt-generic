@@ -4,7 +4,7 @@
 # claude-generic - Generic Claude Agent Tool
 #
 # This script provides a generic framework for running Claude AI agents
-# with configurable prompts from the promptLibrary directory.
+# with configurable prompts from the ../lib/prompt-library directory.
 #
 # Author: Generated for enhanced productivity
 # Version: 1.0.0
@@ -22,7 +22,7 @@ CURSOR_OUTPUT_FORMAT="${CURSOR_OUTPUT_FORMAT:-"text"}"
 CURSOR_ALLOWED_TOOLS="${CURSOR_ALLOWED_TOOLS:-Edit Bash(*)}"
 CURSOR_BINARY="${CURSOR_BINARY:-"cursor-agent"}"
 CURSOR_EXTRA_ARGS="${CURSOR_EXTRA_ARGS:-}"
-PROMPT_LIBRARY_DIR="${PROMPT_LIBRARY_DIR:-$HOME/bin/promptLibrary}"
+PROMPT_LIBRARY_DIR="${PROMPT_LIBRARY_DIR:-$SCRIPT_DIR/../lib/prompt-library}"
 
 # Script metadata
 SCRIPT_NAME="$(basename "$0")"
@@ -55,10 +55,10 @@ show_usage() {
     cat << EOF
 Usage: $SCRIPT_NAME <agent-name> [OPTIONS]
 
-Generic Claude agent runner that loads prompts from the promptLibrary directory.
+Generic Claude agent runner that loads prompts from the ../lib/prompt-library directory.
 
 ARGUMENTS:
-    agent-name                  Name of the agent (loads from promptLibrary/<agent-name>-agent)
+    agent-name                  Name of the agent (loads from ../lib/prompt-library/<agent-name>-agent)
 
 OPTIONS:
     -h, --help                  Show this help message
@@ -75,7 +75,7 @@ ENVIRONMENT VARIABLES:
     CURSOR_ALLOWED_TOOLS        Tools allowed for Claude (default: *)
     CURSOR_BINARY               Path to Claude binary
     CURSOR_EXTRA_ARGS           Additional arguments for Claude
-    PROMPT_LIBRARY_DIR          Directory containing prompt files (default: ./promptLibrary)
+    PROMPT_LIBRARY_DIR          Directory containing prompt files (default: ./../lib/prompt-library)
 
 EXAMPLES:
     $SCRIPT_NAME code-reviewer              # Run code-reviewer agent
@@ -131,7 +131,7 @@ execute_agent() {
         "cat \"$prompt_path\""
         "|"
         "$CURSOR_BINARY"
-        sonnet
+        gpt5
         --output-format "$CURSOR_OUTPUT_FORMAT"
         --print
         --force
