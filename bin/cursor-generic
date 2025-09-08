@@ -16,6 +16,11 @@ set -euo pipefail
 # CONFIGURATION
 # =============================================================================
 
+# Script metadata
+SCRIPT_NAME="$(basename "$0")"
+SCRIPT_VERSION="1.0.0"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Default configuration - can be overridden by environment variables
 CURSOR_INPUT_FORMAT="${CURSOR_INPUT_FORMAT:-text}"
 CURSOR_OUTPUT_FORMAT="${CURSOR_OUTPUT_FORMAT:-"text"}"
@@ -23,11 +28,6 @@ CURSOR_ALLOWED_TOOLS="${CURSOR_ALLOWED_TOOLS:-Edit Bash(*)}"
 CURSOR_BINARY="${CURSOR_BINARY:-"cursor-agent"}"
 CURSOR_EXTRA_ARGS="${CURSOR_EXTRA_ARGS:-}"
 PROMPT_LIBRARY_DIR="${PROMPT_LIBRARY_DIR:-$SCRIPT_DIR/../lib/prompt-library}"
-
-# Script metadata
-SCRIPT_NAME="$(basename "$0")"
-SCRIPT_VERSION="1.0.0"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # =============================================================================
 # UTILITY FUNCTIONS

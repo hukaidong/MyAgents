@@ -16,6 +16,11 @@ set -euo pipefail
 # CONFIGURATION
 # =============================================================================
 
+# Script metadata
+SCRIPT_NAME="$(basename "$0")"
+SCRIPT_VERSION="1.0.0"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Default configuration - can be overridden by environment variables
 CLAUDE_INPUT_FORMAT="${CLAUDE_INPUT_FORMAT:-text}"
 CLAUDE_OUTPUT_FORMAT="${CLAUDE_OUTPUT_FORMAT:-"stream-json"}"
@@ -23,11 +28,6 @@ CLAUDE_ALLOWED_TOOLS="${CLAUDE_ALLOWED_TOOLS:-Edit Bash(*)}"
 CLAUDE_BINARY="${CLAUDE_BINARY:-claude}"
 CLAUDE_EXTRA_ARGS="${CLAUDE_EXTRA_ARGS:-}"
 PROMPT_LIBRARY_DIR="${PROMPT_LIBRARY_DIR:-$SCRIPT_DIR/../lib/prompt-library}"
-
-# Script metadata
-SCRIPT_NAME="$(basename "$0")"
-SCRIPT_VERSION="1.0.0"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # =============================================================================
 # UTILITY FUNCTIONS
