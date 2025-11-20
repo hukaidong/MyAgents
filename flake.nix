@@ -3,30 +3,34 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
-    cursor-agent.url = "github:hukaidong/cursor-agent-flake";
+    nix-ai-tools.url = "github:numtide/nix-ai-tools";
   };
 
   outputs =
     {
       self,
       nixpkgs,
-      cursor-agent,
+      nix-ai-tools,
     }:
     let
       pkgs = import nixpkgs {
         system = "x86_64-linux";
         config.allowUnfree = true;
       };
+      aitools = nix-ai-tools.packages.x86_64-linux;
     in
     {
       packages.x86_64-linux.my-agents = pkgs.stdenv.mkDerivation rec {
         name = "my-agents";
-        src = builtins.path { path = ./.; name = "MyAgents"; };
+        src = builtins.path {
+          path = ./.;
+          name = "MyAgents";
+        };
 
-        buildInputs = with pkgs; [
-          git
-          claude-code
-          cursor-agent.packages.x86_64-linux.default
+        buildInputs = [
+          pkgs.git
+          aitools.claude-code
+          aitools.cursor-agent
         ];
 
         installPhase = ''
